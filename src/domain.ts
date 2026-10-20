@@ -16,6 +16,7 @@ export type Operation = {
   subcategory: string;
   date: string;
   note: string;
+  related?: string;
 };
 export type CategoryMap = Record<string, string[]>;
 export type Data = {

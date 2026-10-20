@@ -1,3 +1,4 @@
+import GoogleSheetsSettings from "./GoogleSheetsSettings";
 import Modal from "./Modal";
 import CategorySettings from "./CategorySettings";
 import { useEffect, useRef, useState } from "react";
@@ -304,7 +305,7 @@ export default function App() {
         </nav>
         <div className="sidebar-bottom">
           <div className="local-status">
-            <span /> Всё на вашем устройстве
+            <span /> Локальная копия данных
           </div>
           <p>
             Маленькие шаги.
@@ -646,9 +647,10 @@ export default function App() {
               <section className="panel settings-panel">
                 <h3>Ваши данные</h3>
                 <p>
-                  Операции хранятся только в этом браузере. Экспортируйте копию,
-                  чтобы сохранить её отдельно. Пока экспорт предназначен для
-                  резервного копирования: импорт появится позднее.
+                  Локальная копия операций хранится в этом браузере.
+                  Экспортируйте копию, чтобы сохранить её отдельно. Пока экспорт
+                  предназначен для резервного копирования: импорт появится
+                  позднее.
                 </p>
                 <button className="secondary" onClick={() => exportData()}>
                   <Download size={18} /> Экспортировать JSON
@@ -675,15 +677,14 @@ export default function App() {
                   Загрузить демоданные
                 </button>
               </section>
-              <section className="panel settings-panel">
-                <h3>
-                  Google Sheets <span className="soon">Позднее</span>
-                </h3>
-                <p>
-                  Подключение таблиц запланировано на следующий этап. Сейчас
-                  можно вести учёт без авторизации.
-                </p>
-              </section>
+              <GoogleSheetsSettings
+                data={data}
+                disabled={!allowSave}
+                onImport={(incoming) => {
+                  setData(incoming);
+                  setMonth(today().slice(0, 7));
+                }}
+              />
               <section className="panel settings-panel">
                 <h3>Быстрый ввод</h3>
                 <p>

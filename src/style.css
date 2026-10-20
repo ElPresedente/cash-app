@@ -1632,3 +1632,75 @@ h1 {
     font-size: 11px;
   }
 }
+
+.google-settings > label {
+  display: grid;
+  gap: 8px;
+  font-size: 11px;
+  color: #91869f;
+  margin: 16px 0;
+}
+.google-settings input {
+  width: 100%;
+  min-height: 44px;
+  border: 1px solid #e7e3ef;
+  border-radius: 9px;
+  padding: 12px;
+  background: #fdfcfe;
+  color: #3e354e;
+  font-size: 12px;
+  min-width: 0;
+}
+.google-settings input:focus {
+  outline: 2px solid #d8ccf4;
+  outline-offset: 1px;
+}
+.google-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 15px;
+}
+.google-settings .google-actions .secondary {
+  margin: 0;
+}
+.google-help {
+  margin: 14px 0 22px;
+  font-size: 11px;
+  color: #91869f;
+  line-height: 1.9;
+}
+.google-help summary {
+  color: #8670bd;
+  cursor: pointer;
+}
+.google-help ol {
+  padding-left: 20px;
+}
+.google-help li {
+  margin: 9px 0;
+}
+.google-help a {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #8670bd;
+}
+.google-help code {
+  overflow-wrap: anywhere;
+}
+.google-confirm {
+  margin-top: 18px;
+  padding: 15px;
+  background: #f7f3ff;
+  border: 1px solid #e8dff8;
+  border-radius: 12px;
+}
+.google-confirm h4 {
+  margin: 0;
+  font-size: 12px;
+}
+.google-settings .category-notice,
+.google-settings .form-error {
+  margin-top: 16px;
+}
