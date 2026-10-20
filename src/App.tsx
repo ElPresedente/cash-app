@@ -104,6 +104,12 @@ export default function App() {
   const [menu, setMenu] = useState(false);
   const [hoverKind, setHoverKind] = useState<Kind | null>(null);
   const [accountForm, setAccountForm] = useState(false);
+  const [editingAccountId, setEditingAccountId] = useState<string | null>(null);
+  const editingAccount = data.accounts.find((a) => a.id === editingAccountId);
+  function closeAccountForm() {
+    setAccountForm(false);
+    setEditingAccountId(null);
+  }
   const [notice, setNotice] = useState("");
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const held = useRef(false);
@@ -588,6 +594,16 @@ export default function App() {
                     <h3>{a.name}</h3>
                     <h2>{money(totals[a.id])}</h2>
                     <p>Начальный остаток: {money(a.opening)}</p>
+                    <button
+                      className="secondary account-edit"
+                      aria-label={`Редактировать счёт ${a.name}`}
+                      onClick={() => {
+                        setEditingAccountId(a.id);
+                        setAccountForm(true);
+                      }}
+                    >
+                      Редактировать
+                    </button>
                   </article>
                 ))}
                 <button
@@ -800,7 +816,10 @@ export default function App() {
         />
       )}
       {accountForm && (
-        <Modal title="Новый счёт" onClose={() => setAccountForm(false)}>
+        <Modal
+          title={editingAccount ? "Редактировать счёт" : "Новый счёт"}
+          onClose={closeAccountForm}
+        >
           <form
             onSubmit={(e) => {
               e.preventDefault();
@@ -815,19 +834,32 @@ export default function App() {
                 setNotice("Укажите корректный начальный остаток");
                 return;
               }
-              setData({
-                ...data,
-                accounts: [
-                  ...data.accounts,
-                  {
-                    id: crypto.randomUUID(),
-                    name: accountName,
-                    opening,
-                    color: "#70998a",
-                  },
-                ],
-              });
-              setAccountForm(false);
+              if (!allowSave) {
+                setNotice(
+                  "Сначала экспортируйте исходные данные и очистите хранилище в настройках",
+                );
+                return;
+              }
+              setData((current) => ({
+                ...current,
+                accounts: editingAccount
+                  ? current.accounts.map((account) =>
+                      account.id === editingAccount.id
+                        ? { ...account, name: accountName, opening }
+                        : account,
+                    )
+                  : [
+                      ...current.accounts,
+                      {
+                        id: crypto.randomUUID(),
+                        name: accountName,
+                        opening,
+                        color: "#70998a",
+                      },
+                    ],
+              }));
+              setNotice(editingAccount ? "Счёт обновлён" : "Счёт добавлен");
+              closeAccountForm();
             }}
           >
             <label>
@@ -837,6 +869,7 @@ export default function App() {
                 required
                 maxLength={60}
                 placeholder="Например, накопительный"
+                defaultValue={editingAccount?.name ?? ""}
               />
             </label>
             <label>
@@ -844,12 +877,16 @@ export default function App() {
               <input
                 name="opening"
                 inputMode="decimal"
-                defaultValue="0"
+                defaultValue={
+                  editingAccount
+                    ? (editingAccount.opening / 100).toFixed(2)
+                    : "0"
+                }
                 required
               />
             </label>
             <button className="primary" type="submit">
-              Добавить счёт
+              {editingAccount ? "Сохранить изменения" : "Добавить счёт"}
             </button>
           </form>
         </Modal>
