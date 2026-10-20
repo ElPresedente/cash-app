@@ -107,3 +107,91 @@ test("account deletion protects transaction sources, transfer destinations and l
   assert.ok(accountDeletionError(data, "main"));
   assert.ok(accountDeletionError(data, "missing"));
 });
+
+import {
+  restoreData,
+  saveCategory,
+  deleteCategory,
+  categoryDeletionError,
+} from "../src/domain.ts";
+test("legacy data migrates with all account balances and operations intact", () => {
+  const current = emptyData();
+  current.accounts[0].opening = 129900;
+  const legacy = {
+    version: 1,
+    accounts: current.accounts,
+    operations: [operation()],
+  };
+  const migrated = restoreData(JSON.parse(JSON.stringify(legacy)));
+  assert.ok(migrated);
+  assert.equal(migrated.version, 2);
+  assert.deepEqual(migrated.operations, legacy.operations);
+  assert.deepEqual(migrated.accounts, legacy.accounts);
+  assert.ok(migrated.categories["Кафе и рестораны"].includes("Кофе"));
+  assert.equal(
+    restoreData({ ...legacy, operations: [{ ...operation(), amount: -1 }] }),
+    null,
+  );
+});
+test("custom categories validate and persist through a JSON roundtrip", () => {
+  const data = saveCategory(emptyData(), null, " Путешествия ", [
+    { original: null, name: " Отели " },
+  ]);
+  const op = operation({ category: "Путешествия", subcategory: "Отели" });
+  assert.equal(validate(op, data.accounts, data.categories), "");
+  data.operations = [op];
+  const restored = restoreData(JSON.parse(JSON.stringify(data)));
+  assert.ok(restored);
+  assert.deepEqual(restored.categories["Путешествия"], ["Отели"]);
+  assert.equal(restored.operations[0].subcategory, "Отели");
+  assert.ok(
+    validate({ ...op, category: "Нет такой" }, data.accounts, data.categories),
+  );
+});
+test("category and subcategory renaming preserves transaction history and balances", () => {
+  const data = emptyData();
+  data.operations = [operation(), operation({ id: "2", subcategory: "" })];
+  const renamed = saveCategory(data, "Кафе и рестораны", "Еда вне дома", [
+    { original: "Кофе", name: "Напитки" },
+    { original: "Обед", name: "Обед" },
+    { original: "Ресторан", name: "Ресторан" },
+  ]);
+  assert.equal(renamed.operations[0].category, "Еда вне дома");
+  assert.equal(renamed.operations[0].subcategory, "Напитки");
+  assert.equal(renamed.operations[1].subcategory, "");
+  assert.deepEqual(balances(renamed), balances(data));
+  assert.ok(isData(renamed));
+  assert.equal(data.operations[0].category, "Кафе и рестораны");
+});
+test("category editing rejects duplicates, empty names and deletion of used subcategories", () => {
+  const data = emptyData();
+  data.operations = [operation()];
+  assert.throws(() => saveCategory(data, null, " продукты ", []));
+  assert.throws(() => saveCategory(data, null, " ", []));
+  assert.throws(() =>
+    saveCategory(data, null, "Новая", [
+      { original: null, name: "А" },
+      { original: null, name: " а " },
+    ]),
+  );
+  assert.throws(() => saveCategory(data, "Кафе и рестораны", "Кафе", []));
+  assert.throws(() =>
+    saveCategory(data, null, "Новая", [{ original: null, name: "" }]),
+  );
+});
+test("category deletion protects history and the last category", () => {
+  const data = emptyData();
+  data.operations = [operation()];
+  assert.ok(categoryDeletionError(data, "Кафе и рестораны"));
+  assert.throws(() => deleteCategory(data, "Кафе и рестораны"));
+  const next = deleteCategory(data, "Покупки");
+  assert.equal(Object.hasOwn(next.categories, "Покупки"), false);
+  assert.deepEqual(next.operations, data.operations);
+  assert.ok(isData(next));
+  assert.throws(() =>
+    deleteCategory(
+      { ...emptyData(), categories: { Единственная: [] } },
+      "Единственная",
+    ),
+  );
+});

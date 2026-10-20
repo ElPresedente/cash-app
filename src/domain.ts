@@ -17,7 +17,13 @@ export type Operation = {
   date: string;
   note: string;
 };
-export type Data = { version: 1; accounts: Account[]; operations: Operation[] };
+export type CategoryMap = Record<string, string[]>;
+export type Data = {
+  version: 2;
+  accounts: Account[];
+  operations: Operation[];
+  categories: CategoryMap;
+};
 export const kinds: Record<Kind, string> = {
   expense: "Расход",
   income: "Доход",
@@ -54,7 +60,10 @@ export function parseMoney(value: string): number {
   return Number.isSafeInteger(n) ? n : NaN;
 }
 export const emptyData = (): Data => ({
-  version: 1,
+  version: 2,
+  categories: Object.fromEntries(
+    Object.entries(categories).map(([name, subs]) => [name, [...subs]]),
+  ),
   accounts: [
     { id: "main", name: "Основной счёт", opening: 0, color: "#7564df" },
     { id: "cash", name: "Наличные", opening: 0, color: "#d7a25c" },
@@ -72,7 +81,11 @@ export function balances(data: Data) {
   }
   return result;
 }
-export function validate(op: Operation, accounts: Account[]): string {
+export function validate(
+  op: Operation,
+  accounts: Account[],
+  catalog: CategoryMap = categories,
+): string {
   if (!op.title.trim()) return "Добавьте название операции";
   if (!Number.isSafeInteger(op.amount) || op.amount <= 0)
     return "Введите сумму больше нуля, до двух знаков после запятой";
@@ -91,10 +104,10 @@ export function validate(op: Operation, accounts: Account[]): string {
     return "Укажите корректную дату";
   if (
     (op.kind === "income" || op.kind === "expense") &&
-    !categories[op.category]
+    !Object.hasOwn(catalog, op.category)
   )
     return "Выберите категорию";
-  if (op.subcategory && !categories[op.category]?.includes(op.subcategory))
+  if (op.subcategory && !catalog[op.category]?.includes(op.subcategory))
     return "Проверьте подкатегорию";
   return "";
 }
@@ -140,7 +153,8 @@ export function isData(value: unknown): value is Data {
   if (!value || typeof value !== "object") return false;
   const d = value as Data;
   return (
-    d.version === 1 &&
+    d.version === 2 &&
+    isCategoryMap(d.categories) &&
     Array.isArray(d.accounts) &&
     d.accounts.length > 0 &&
     d.accounts.every(
@@ -161,7 +175,7 @@ export function isData(value: unknown): value is Data {
         typeof o.title === "string" &&
         typeof o.note === "string" &&
         typeof o.subcategory === "string" &&
-        !validate(o, d.accounts),
+        !validate(o, d.accounts, d.categories),
     )
   );
 }
@@ -207,4 +221,144 @@ export function accountDeletionError(data: Data, id: string): string {
   )
     return "У счёта есть операции. Сначала удалите связанные операции, включая переводы, чтобы сохранить корректность истории и балансов.";
   return "";
+}
+
+const categoryKey = (name: string) => name.trim().toLocaleLowerCase("ru");
+function isCategoryMap(value: unknown): value is CategoryMap {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const entries = Object.entries(value);
+  return (
+    entries.length > 0 &&
+    new Set(entries.map(([name]) => categoryKey(name))).size ===
+      entries.length &&
+    entries.every(
+      ([name, subs]) =>
+        name.trim() === name &&
+        name.length > 0 &&
+        name.length <= 60 &&
+        Array.isArray(subs) &&
+        subs.every(
+          (s) =>
+            typeof s === "string" &&
+            s.trim() === s &&
+            s.length > 0 &&
+            s.length <= 60,
+        ) &&
+        new Set(subs.map(categoryKey)).size === subs.length,
+    )
+  );
+}
+// Upgrade the original browser data without changing accounts or transactions.
+export function restoreData(value: unknown): Data | null {
+  if (isData(value)) return value;
+  if (
+    value &&
+    typeof value === "object" &&
+    "version" in value &&
+    value.version === 1
+  ) {
+    const migrated = {
+      ...value,
+      version: 2,
+      categories: Object.fromEntries(
+        Object.entries(categories).map(([name, subs]) => [name, [...subs]]),
+      ),
+    };
+    return isData(migrated) ? migrated : null;
+  }
+  return null;
+}
+export type SubcategoryDraft = { original: string | null; name: string };
+export function saveCategory(
+  data: Data,
+  original: string | null,
+  rawName: string,
+  rows: SubcategoryDraft[],
+): Data {
+  const name = rawName.trim();
+  if (!name || name.length > 60)
+    throw new Error("Название категории должно содержать от 1 до 60 символов");
+  if (original !== null && !Object.hasOwn(data.categories, original))
+    throw new Error("Категория не найдена");
+  if (
+    Object.keys(data.categories).some(
+      (key) => key !== original && categoryKey(key) === categoryKey(name),
+    )
+  )
+    throw new Error("Категория с таким названием уже существует");
+  const subs = rows.map((row) => ({ ...row, name: row.name.trim() }));
+  if (subs.some((row) => !row.name || row.name.length > 60))
+    throw new Error(
+      "Название подкатегории должно содержать от 1 до 60 символов",
+    );
+  if (new Set(subs.map((row) => categoryKey(row.name))).size !== subs.length)
+    throw new Error("Названия подкатегорий не должны повторяться");
+  const originals = subs
+    .filter((row) => row.original !== null)
+    .map((row) => row.original!);
+  if (
+    new Set(originals).size !== originals.length ||
+    originals.some(
+      (sub) => original === null || !data.categories[original].includes(sub),
+    )
+  )
+    throw new Error("Проверьте подкатегории");
+  if (
+    original !== null &&
+    data.operations.some(
+      (op) =>
+        op.category === original &&
+        op.subcategory &&
+        !originals.includes(op.subcategory),
+    )
+  )
+    throw new Error(
+      "Нельзя удалить подкатегорию с операциями. Сначала удалите связанные операции.",
+    );
+  const catalog =
+    original === null
+      ? Object.fromEntries([
+          ...Object.entries(data.categories),
+          [name, subs.map((row) => row.name)],
+        ])
+      : Object.fromEntries(
+          Object.entries(data.categories).map(([key, values]) =>
+            key === original
+              ? [name, subs.map((row) => row.name)]
+              : [key, values],
+          ),
+        );
+  return {
+    ...data,
+    categories: catalog,
+    operations: data.operations.map((op) =>
+      op.category !== original
+        ? op
+        : {
+            ...op,
+            category: name,
+            subcategory: op.subcategory
+              ? subs.find((row) => row.original === op.subcategory)!.name
+              : "",
+          },
+    ),
+  };
+}
+export function categoryDeletionError(data: Data, name: string): string {
+  if (!Object.hasOwn(data.categories, name)) return "Категория не найдена";
+  if (Object.keys(data.categories).length <= 1)
+    return "Последнюю категорию удалить нельзя. Сначала добавьте другую.";
+  if (data.operations.some((op) => op.category === name))
+    return "У категории есть операции. Сначала удалите связанные операции.";
+  return "";
+}
+export function deleteCategory(data: Data, name: string): Data {
+  const error = categoryDeletionError(data, name);
+  if (error) throw new Error(error);
+  return {
+    ...data,
+    categories: Object.fromEntries(
+      Object.entries(data.categories).filter(([key]) => key !== name),
+    ),
+  };
 }

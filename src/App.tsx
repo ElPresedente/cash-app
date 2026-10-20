@@ -1,3 +1,5 @@
+import Modal from "./Modal";
+import CategorySettings from "./CategorySettings";
 import { useEffect, useRef, useState } from "react";
 import {
   ArrowDownLeft,
@@ -5,7 +7,6 @@ import {
   ArrowLeftRight,
   ChevronRight,
   Plus,
-  X,
   Wallet,
   LayoutDashboard,
   List,
@@ -27,10 +28,9 @@ import {
 import {
   balances,
   accountDeletionError,
-  categories,
   demoData,
   emptyData,
-  isData,
+  restoreData,
   kinds,
   money,
   parseMoney,
@@ -66,7 +66,7 @@ export default function App() {
   const [loadError] = useState(() => {
     try {
       const raw = localStorage.getItem(STORAGE);
-      return raw && !isData(JSON.parse(raw))
+      return raw && !restoreData(JSON.parse(raw))
         ? "Сохранённые данные не удалось прочитать. Экспортируйте исходные данные в настройках перед сохранением новых операций."
         : "";
     } catch {
@@ -77,7 +77,7 @@ export default function App() {
     try {
       const raw = localStorage.getItem(STORAGE);
       const d = raw ? JSON.parse(raw) : null;
-      return isData(d) ? d : emptyData();
+      return restoreData(d) ?? emptyData();
     } catch {
       return emptyData();
     }
@@ -96,6 +96,7 @@ export default function App() {
     }
   }, [data, allowSave]);
   const [page, setPage] = useState<Page>("overview");
+  const [categoriesOpen, setCategoriesOpen] = useState(false);
   const [month, setMonth] = useState(today().slice(0, 7));
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("all");
@@ -622,8 +623,26 @@ export default function App() {
               </p>
             </>
           )}
-          {page === "settings" && (
+          {page === "settings" && categoriesOpen && (
+            <CategorySettings
+              data={data}
+              onChange={setData}
+              disabled={!allowSave}
+              onBack={() => setCategoriesOpen(false)}
+            />
+          )}
+          {page === "settings" && !categoriesOpen && (
             <div className="settings-stack">
+              <section className="panel settings-panel">
+                <h3>Категории</h3>
+                <p>Настройте категории и подкатегории для своих операций.</p>
+                <button
+                  className="secondary"
+                  onClick={() => setCategoriesOpen(true)}
+                >
+                  Настроить категории <ChevronRight size={16} />
+                </button>
+              </section>
               <section className="panel settings-panel">
                 <h3>Ваши данные</h3>
                 <p>
@@ -997,77 +1016,6 @@ function Empty({
     </div>
   );
 }
-function Modal({
-  title,
-  onClose,
-  children,
-}: {
-  title: string;
-  onClose: () => void;
-  children: React.ReactNode;
-}) {
-  const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    const previous = document.activeElement as HTMLElement | null;
-    const old = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    ref.current?.querySelector<HTMLElement>("input,button,select")?.focus();
-    const key = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-      if (e.key === "Tab") {
-        const elements = Array.from(
-          ref.current?.querySelectorAll<HTMLElement>(
-            'button,input,select,textarea,[tabindex="0"]',
-          ) || [],
-        ).filter((el) => !el.hasAttribute("disabled"));
-        const first = elements[0],
-          last = elements.at(-1);
-        if (e.shiftKey && document.activeElement === first) {
-          e.preventDefault();
-          last?.focus();
-        } else if (!e.shiftKey && document.activeElement === last) {
-          e.preventDefault();
-          first?.focus();
-        }
-      }
-    };
-    document.addEventListener("keydown", key);
-    return () => {
-      document.body.style.overflow = old;
-      document.removeEventListener("keydown", key);
-      previous?.focus();
-    };
-  }, []);
-  return (
-    <div
-      className="modal-scrim"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) onClose();
-      }}
-    >
-      <div
-        ref={ref}
-        className="modal"
-        role="dialog"
-        aria-modal="true"
-        aria-label={title}
-      >
-        <div className="modal-handle" />
-        <div className="modal-heading">
-          <h2>{title}</h2>
-          <button
-            className="icon-button"
-            onClick={onClose}
-            aria-label="Закрыть"
-          >
-            <X size={21} />
-          </button>
-        </div>
-        {children}
-      </div>
-    </div>
-  );
-}
 function OperationEditor({
   initial,
   full,
@@ -1081,6 +1029,7 @@ function OperationEditor({
   onClose: () => void;
   onSave: (o: Operation) => void;
 }) {
+  const categories = data.categories;
   const [op, setOp] = useState<Operation>({
     id: crypto.randomUUID(),
     kind: initial,
@@ -1104,7 +1053,7 @@ function OperationEditor({
   }
   function save() {
     const next = { ...op, title: op.title.trim(), amount: parseMoney(amount) };
-    const message = validate(next, data.accounts);
+    const message = validate(next, data.accounts, data.categories);
     if (message) {
       setError(message);
       return;
