@@ -85,3 +85,25 @@ test("storage schema rejects damaged records and unknown operation types", () =>
   );
   assert.equal(isData({ version: 2 }), false);
 });
+
+import { accountDeletionError } from "../src/domain.ts";
+test("account deletion protects transaction sources, transfer destinations and last account", () => {
+  const data = emptyData();
+  assert.equal(accountDeletionError(data, "cash"), "");
+  data.operations = [
+    operation({
+      kind: "transfer",
+      toAccountId: "cash",
+      category: "",
+      subcategory: "",
+    }),
+  ];
+  assert.ok(accountDeletionError(data, "cash"));
+  assert.ok(accountDeletionError(data, "main"));
+  data.operations = [operation()];
+  assert.equal(accountDeletionError(data, "cash"), "");
+  data.operations = [];
+  data.accounts = [data.accounts[0]];
+  assert.ok(accountDeletionError(data, "main"));
+  assert.ok(accountDeletionError(data, "missing"));
+});

@@ -192,3 +192,19 @@ export function demoData(): Data {
   );
   return d;
 }
+
+export function accountDeletionError(data: Data, id: string): string {
+  if (!data.accounts.some((account) => account.id === id))
+    return "Счёт не найден";
+  if (data.accounts.length <= 1)
+    return "Последний счёт удалить нельзя. Сначала добавьте другой.";
+  if (
+    data.operations.some(
+      (op) =>
+        op.accountId === id ||
+        (op.kind === "transfer" && op.toAccountId === id),
+    )
+  )
+    return "У счёта есть операции. Сначала удалите связанные операции, включая переводы, чтобы сохранить корректность истории и балансов.";
+  return "";
+}

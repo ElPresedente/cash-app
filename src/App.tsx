@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 import {
   balances,
+  accountDeletionError,
   categories,
   demoData,
   emptyData,
@@ -104,9 +105,11 @@ export default function App() {
   const [menu, setMenu] = useState(false);
   const [hoverKind, setHoverKind] = useState<Kind | null>(null);
   const [accountForm, setAccountForm] = useState(false);
+  const [confirmAccountDelete, setConfirmAccountDelete] = useState(false);
   const [editingAccountId, setEditingAccountId] = useState<string | null>(null);
   const editingAccount = data.accounts.find((a) => a.id === editingAccountId);
   function closeAccountForm() {
+    setConfirmAccountDelete(false);
     setAccountForm(false);
     setEditingAccountId(null);
   }
@@ -888,6 +891,78 @@ export default function App() {
             <button className="primary" type="submit">
               {editingAccount ? "Сохранить изменения" : "Добавить счёт"}
             </button>
+            {editingAccount && (
+              <div className="account-delete-section">
+                {confirmAccountDelete ? (
+                  <div role="alert">
+                    <p className="helper">
+                      Удалить счёт «{editingAccount.name}»? Его остаток{" "}
+                      {money(editingAccount.opening)} будет исключён из общего
+                      баланса. Это действие нельзя отменить.
+                    </p>
+                    <div className="form-actions">
+                      <button
+                        type="button"
+                        className="secondary"
+                        onClick={() => setConfirmAccountDelete(false)}
+                      >
+                        Отмена
+                      </button>
+                      <button
+                        type="button"
+                        className="danger-button"
+                        onClick={() => {
+                          if (!allowSave) {
+                            setNotice(
+                              "Сначала сохраните исходные данные и очистите хранилище в настройках",
+                            );
+                            return;
+                          }
+                          const error = accountDeletionError(
+                            data,
+                            editingAccount.id,
+                          );
+                          if (error) {
+                            setNotice(error);
+                            setConfirmAccountDelete(false);
+                            return;
+                          }
+                          setData((current) => ({
+                            ...current,
+                            accounts: current.accounts.filter(
+                              (a) => a.id !== editingAccount.id,
+                            ),
+                          }));
+                          closeAccountForm();
+                          setNotice("Счёт удалён");
+                        }}
+                      >
+                        Да, удалить счёт
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <button
+                      type="button"
+                      className="text-danger"
+                      disabled={
+                        !allowSave ||
+                        !!accountDeletionError(data, editingAccount.id)
+                      }
+                      onClick={() => setConfirmAccountDelete(true)}
+                    >
+                      <Trash2 size={17} /> Удалить счёт
+                    </button>
+                    {!!accountDeletionError(data, editingAccount.id) && (
+                      <p className="helper">
+                        {accountDeletionError(data, editingAccount.id)}
+                      </p>
+                    )}
+                  </>
+                )}
+              </div>
+            )}
           </form>
         </Modal>
       )}

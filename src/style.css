@@ -1537,3 +1537,19 @@ h1 {
 .account-edit {
   margin-top: 18px;
 }
+
+.account-delete-section {
+  border-top: 1px solid var(--border);
+  padding-top: 12px;
+}
+.account-delete-section .helper {
+  margin-top: 0;
+}
+.danger-button {
+  background: #b85c51;
+  color: white;
+  padding: 12px 16px;
+  border-radius: 9px;
+  font-size: 12px;
+  font-weight: 700;
+}
