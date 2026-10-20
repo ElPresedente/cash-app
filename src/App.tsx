@@ -1,3 +1,4 @@
+import type { GoogleSession } from "./google-sheets";
 import GoogleSheetsSettings from "./GoogleSheetsSettings";
 import Modal from "./Modal";
 import CategorySettings from "./CategorySettings";
@@ -116,6 +117,33 @@ export default function App() {
     setEditingAccountId(null);
   }
   const [notice, setNotice] = useState("");
+  const [googleSession, setGoogleSession] = useState<GoogleSession | null>(
+    null,
+  );
+  useEffect(() => {
+    if (!googleSession) return;
+    const expire = () => {
+      setGoogleSession(null);
+      setNotice("Вход Google истёк. Войдите снова в настройках.");
+    };
+    const expiresIn = googleSession.expiresAt - Date.now() - 30000;
+    if (expiresIn <= 0) {
+      expire();
+      return;
+    }
+    const timer = setTimeout(expire, expiresIn);
+    // Background tabs can suspend timers; check again when the user returns.
+    const checkExpiry = () => {
+      if (googleSession.expiresAt <= Date.now() + 30000) expire();
+    };
+    window.addEventListener("focus", checkExpiry);
+    document.addEventListener("visibilitychange", checkExpiry);
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener("focus", checkExpiry);
+      document.removeEventListener("visibilitychange", checkExpiry);
+    };
+  }, [googleSession]);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const held = useRef(false);
   const start = useRef({ x: 0, y: 0 });
@@ -678,6 +706,8 @@ export default function App() {
                 </button>
               </section>
               <GoogleSheetsSettings
+                session={googleSession}
+                setSession={setGoogleSession}
                 data={data}
                 disabled={!allowSave}
                 onImport={(incoming) => {

@@ -35,13 +35,16 @@ export default function GoogleSheetsSettings({
   data,
   onImport,
   disabled,
+  session,
+  setSession,
 }: {
   data: Data;
   onImport: (data: Data) => void;
   disabled: boolean;
+  session: GoogleSession | null;
+  setSession: (session: GoogleSession | null) => void;
 }) {
   const [config, setConfig] = useState(savedConfig);
-  const [session, setSession] = useState<GoogleSession | null>(null);
   const [sdkReady, setSdkReady] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -61,17 +64,6 @@ export default function GoogleSheetsSettings({
       active = false;
     };
   }, []);
-  useEffect(() => {
-    if (!session) return;
-    const timer = setTimeout(
-      () => {
-        setSession(null);
-        setMessage("Вход Google истёк. Войдите снова, чтобы продолжить обмен.");
-      },
-      Math.max(0, session.expiresAt - Date.now() - 30000),
-    );
-    return () => clearTimeout(timer);
-  }, [session]);
   function update(fields: Partial<typeof config>) {
     setConfig((current) => ({ ...current, ...fields }));
     setSession(null);
