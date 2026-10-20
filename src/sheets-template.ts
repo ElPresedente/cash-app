@@ -139,7 +139,7 @@ export function readTemplate(snapshot: TemplateSnapshot): Data {
         date,
         amount: rubles(row[2]),
         accountId: source.id,
-        toAccountId: target?.id || "",
+        toAccountId: kind === "transfer" ? target?.id || "" : "",
         category: text(row[5]),
         subcategory: text(row[6]),
         title: text(row[7]) || text(row[5]) || kindNames[kind],
@@ -265,13 +265,18 @@ export function uploadPlan(
     const existing = remote.operations.find((o) => o.id === op.id);
     if (existing) {
       const source = data.accounts.find((a) => a.id === op.accountId)?.name,
-        target = data.accounts.find((a) => a.id === op.toAccountId)?.name || "";
+        target =
+          op.kind === "transfer"
+            ? data.accounts.find((a) => a.id === op.toAccountId)?.name || ""
+            : "";
       const remoteSource = remote.accounts.find(
           (a) => a.id === existing.accountId,
         )?.name,
         remoteTarget =
-          remote.accounts.find((a) => a.id === existing.toAccountId)?.name ||
-          "";
+          existing.kind === "transfer"
+            ? remote.accounts.find((a) => a.id === existing.toAccountId)
+                ?.name || ""
+            : "";
       if (
         op.kind !== existing.kind ||
         op.date !== existing.date ||
@@ -305,7 +310,9 @@ export function uploadPlan(
         kindNames[op.kind],
         op.amount / 100,
         data.accounts.find((a) => a.id === op.accountId)!.name,
-        data.accounts.find((a) => a.id === op.toAccountId)?.name || "",
+        op.kind === "transfer"
+          ? data.accounts.find((a) => a.id === op.toAccountId)?.name || ""
+          : "",
         op.category,
         op.subcategory,
         op.title,

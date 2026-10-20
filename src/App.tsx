@@ -1067,7 +1067,7 @@ function OperationEditor({
     title: "",
     amount: 0,
     accountId: data.accounts[0].id,
-    toAccountId: data.accounts[1]?.id || "",
+    toAccountId: initial === "transfer" ? data.accounts[1]?.id || "" : "",
     category: "",
     subcategory: "",
     date: today(),
@@ -1083,7 +1083,12 @@ function OperationEditor({
     setError("");
   }
   function save() {
-    const next = { ...op, title: op.title.trim(), amount: parseMoney(amount) };
+    const next = {
+      ...op,
+      title: op.title.trim(),
+      amount: parseMoney(amount),
+      toAccountId: op.kind === "transfer" ? op.toAccountId : "",
+    };
     const message = validate(next, data.accounts, data.categories);
     if (message) {
       setError(message);

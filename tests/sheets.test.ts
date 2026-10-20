@@ -218,3 +218,43 @@ test("table URLs accept only Google Sheets documents", () => {
   );
   assert.throws(() => spreadsheetId("not-a-table"));
 });
+
+test("destination account is exported only for transfers, including legacy local records", () => {
+  const snapshot = fixture();
+  snapshot.grids["Счета"].push(["Наличные", "Наличные", 0, "RUB", 0, false]);
+  const data = readTemplate(snapshot);
+  const transaction = {
+    id: "destination-test",
+    kind: "expense" as const,
+    date: "2026-10-20",
+    amount: 100,
+    accountId: data.accounts[0].id,
+    toAccountId: data.accounts[1].id,
+    category: "Еда",
+    subcategory: "Продукты",
+    title: "Тест",
+    note: "",
+  };
+  data.operations = [transaction];
+  assert.equal(uploadPlan(data, snapshot)[0].values[4], "");
+  snapshot.grids["Октябрь"].push([
+    sheetDate("2026-10-20"),
+    "Расход",
+    1,
+    "Карта",
+    "Наличные",
+    "Еда",
+    "Продукты",
+    "Тест",
+    "",
+    "",
+    transaction.id,
+  ]);
+  assert.equal(readTemplate(snapshot).operations[0].toAccountId, "");
+  assert.deepEqual(uploadPlan(data, snapshot), []);
+  snapshot.grids["Октябрь"].pop();
+  data.operations = [
+    { ...transaction, kind: "transfer", category: "", subcategory: "" },
+  ];
+  assert.equal(uploadPlan(data, snapshot)[0].values[4], "Наличные");
+});
